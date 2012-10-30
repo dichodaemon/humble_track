@@ -1,7 +1,15 @@
 import cv
 from util import *
+from compute_texcels import *
+from compute_histograms import *
+from find_groups import *
 import numpy as np
 from scipy.cluster.vq import kmeans, vq
+import logging
+logging.basicConfig( format = "%(asctime)-15s - %(levelname)s:%(name)s:%(message)s")
+
+logger = logging.getLogger( __name__ )
+logger.setLevel( logging.DEBUG )
 
 class Detector( object ):
 
@@ -17,41 +25,34 @@ class Detector( object ):
     self.w2 = w2
     self.w3 = w3
 
-  def compute_texcels( self, frame ):
-    result = np.zeros( frame.shape[:2] + (11, ), np.float32 )
-    for i in xrange( 1, frame.shape[0] - 2 ):
-      for j in xrange( 1, frame.shape[1] - 2 ):
-        result[i, j, 0]  = self.w1 * frame[i, j, 0]
-        result[i, j, 1]  = self.w2 * frame[i, j, 1]
-        result[i, j, 2]  = self.w2 * frame[i, j, 2]
-
-        l1 = frame[i, j, 0] * 1.
-        result[i, j, 3]  = self.w3 * ( l1 - frame[i - 1, j - 1, 0] )
-        result[i, j, 4]  = self.w3 * ( l1 - frame[i    , j - 1, 0] )
-        result[i, j, 5]  = self.w3 * ( l1 - frame[i + 1, j - 1, 0] )
-        result[i, j, 6]  = self.w3 * ( l1 - frame[i - 1, j, 0] )
-        result[i, j, 7]  = self.w3 * ( l1 - frame[i + 1, j, 0] )
-        result[i, j, 8]  = self.w3 * ( l1 - frame[i - 1, j + 1, 0] )
-        result[i, j, 9]  = self.w3 * ( l1 - frame[i    , j + 1, 0] )
-        result[i, j, 10] = self.w3 * ( l1 - frame[i + 1, j + 1, 0] )
-    return result
-
   def learn( self, frame ):
-    texcels = self.compute_texcels( frame )
-    self.tc_codebook = kmeans( flatten( texcels ), self.num_texcels )
+    logger.debug( "Computing Texcels" )
+    texcels = compute_texcels( frame, self.w1, self.w2, self.w3 )
+    logger.debug( "Computing Texcel codebook" )
+    self.tc_codebook, _ = kmeans( flatten( texcels ), self.num_texcels )
     tc_image, _ = vq( flatten( texcels ), self.tc_codebook )
+    tc_image = tc_image.astype( np.float32 )
     tc_image = tc_image.reshape( frame.shape[:2] )
 
-    histograms = self.compute_histograms( tc_image )
-    self.hg_codebook = kmeans( flatten( histograms ), self.num_histograms )
+    logger.debug( "Computing Histograms" )
+    histograms = compute_histograms( tc_image, self.num_texcels, self.window_size )
+    logger.debug( "Computing Histogram codebook" )
+    self.hg_codebook, _ = kmeans( flatten( histograms ), self.num_histograms )
 
   def segment( self, frame ):
-    texcels = self.compute_texcels( frame )
+    logger.debug( "Computing Texcels" )
+    texcels = compute_texcels( frame, self.w1, self.w2, self.w3 )
+    logger.debug( "Building texcel image" )
     tc_image, _ = vq( flatten( texcels ), self.tc_codebook )
+    tc_image = tc_image.astype( np.float32 )
     tc_image = tc_image.reshape( frame.shape[:2] )
     
-    histograms = self.compute_histograms( tc_image )
+    logger.debug( "Computing Histograms" )
+    histograms = compute_histograms( tc_image, self.num_texcels, self.window_size )
+    logger.debug( "Building histogram image" )
     hg_image, _ = vq( flatten( histograms ), self.hg_codebook )
-    h_labels = h_labels.reshape( frame.shape[:2] )
-    return h_labels
+    hg_image = hg_image.astype( np.int32 )
+    hg_image = hg_image.reshape( frame.shape[:2] )
+    find_groups( hg_image )
+    return hg_image
 

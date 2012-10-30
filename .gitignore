@@ -1,5 +1,8 @@
 *.py[co]
 
+python/**/*.c
+python/**/*.so
+
 # Packages
 *.egg
 *.egg-info
