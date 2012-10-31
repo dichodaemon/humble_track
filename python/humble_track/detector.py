@@ -53,6 +53,7 @@ class Detector( object ):
     hg_image, _ = vq( flatten( histograms ), self.hg_codebook )
     hg_image = hg_image.astype( np.int32 )
     hg_image = hg_image.reshape( frame.shape[:2] )
-    find_groups( hg_image )
+    total, groups, counts = find_groups( hg_image )
+    print total
     return hg_image
 

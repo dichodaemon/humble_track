@@ -10,6 +10,8 @@ def find_groups( np.ndarray[np.int32_t, ndim=2] image ):
   cdef np.ndarray[np.int32_t, ndim=2] groups = np.zeros( ( d0, d1 ), np.int32 )
   cdef np.ndarray[np.int32_t, ndim=1] parent = np.ones( ( 100000, ), np.int32 ) * -1
   cdef np.ndarray[np.int32_t, ndim=1] index  = np.ones( ( 100000, ), np.int32 ) * -1
+  cdef np.ndarray[np.int32_t, ndim=1] reindex = np.ones( ( 100000, ), np.int32 ) * -1
+  cdef np.ndarray[np.int32_t, ndim=1] counts = np.zeros( ( 100000, ), np.int32 ) * -1
 
   cdef int next_group = 0
   cdef int i, j
@@ -35,7 +37,24 @@ def find_groups( np.ndarray[np.int32_t, ndim=2] image ):
       if group == next_group:
         parent[next_group] = next_group
         next_group += 1
-  print "groups", next_group    
+
+  group = 0
+  for i in xrange( next_group ):
+    j = i
+    while parent[j] != j:
+      j = parent[j]
+    if reindex[j] == -1:
+      reindex[j] = group
+      group += 1
+    index[i] = reindex[j]
+  
+  for i in xrange( image.shape[0] ):
+    for j in xrange( image.shape[1] ):
+      groups[i, j] = index[groups[i, j]]
+      counts[groups[i, j]] += 1
+  return group, groups, counts
+
+
 
 
       
