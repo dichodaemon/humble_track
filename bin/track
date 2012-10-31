@@ -1,0 +1,78 @@
+#! /usr/bin/python
+# -*- coding: utf-8 -*-
+
+import sys
+import os
+
+BASE_DIR = os.path.abspath( os.path.join( os.path.dirname( __file__ ), ".." ) )
+sys.path.append( os.path.abspath( os.path.join( BASE_DIR, "python" ) ) )
+sys.path.append( os.path.abspath( os.path.join( BASE_DIR, "build" ) ) )
+
+import humble_track as ht
+import cv
+import numpy as np
+import logging
+from optparse import OptionParser
+
+logging.basicConfig()
+
+logger = logging.getLogger( __name__ )
+logger.setLevel( logging.DEBUG )
+
+# Process command line
+parser = OptionParser( usage = "usage: %prog [options] video_file" )
+parser.add_option( 
+  "--window_size", help = "Size of the histogram window", type = "int", 
+  dest = "window_size", default = 5
+)
+parser.add_option( 
+  "--texel_count", help = "Number of texcels", type = "int", 
+  dest = "num_texcels", default = 16
+)
+parser.add_option( 
+  "--num_histograms", help = "Number of histograms", type = "int", 
+  dest = "num_histograms", default = 16
+)
+
+options, args = parser.parse_args()
+
+if len( args ) < 1:
+  parser.error( "Incorrect number of arguments" )
+  exit( 1 )
+
+filename =  args[0]
+
+capture = cv.CaptureFromFile( filename )
+cv.NamedWindow( filename )
+cv.NamedWindow( "Segmented" )
+
+detector = ht.Detector( 
+  window_size = options.window_size, 
+  num_texcels = options.num_texcels, 
+  num_histograms = options.num_histograms 
+)
+
+palette = ht.create_palette( options.num_histograms )
+
+current_frame = 0
+while True:
+  frame = cv.GetMat( cv.QueryFrame( capture ) )
+  current_frame += 1
+  cielab = cv.CreateMat( frame.rows, frame.cols, frame.type )
+  cv.CvtColor( frame, cielab, cv.CV_RGB2Lab )
+
+  np_frame = np.asarray( cielab )
+
+  if current_frame == 10:
+    logger.info( "Learning segmentation features" )
+    detector.learn( np_frame )
+  elif current_frame > 10:
+    logger.debug( "Segmenting frame #%i", current_frame )
+    fg = detector.segment( np_frame ).astype( np.int8 )
+    cv.ShowImage( "Segmented", cv.fromarray( ht.colorize( fg, palette ) ) )
+  else:
+    cv.ShowImage( "Segmented", frame )
+  cv.ShowImage( filename, frame )
+  key = cv.WaitKey( 10 )
+  if key == 27:
+    sys.exit( 0 )
