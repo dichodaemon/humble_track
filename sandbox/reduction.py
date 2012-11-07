@@ -4,6 +4,8 @@ from tick_tack import *
 
 import util
 
+g_size = 500
+
 class reduction( util.Program ):
   def __init__( self ):
     util.Program.__init__( self )
@@ -37,7 +39,6 @@ class reduction( util.Program ):
 
   def v2( self ):
     size = 300000
-    g_size = 500
     mf = cl.mem_flags
 
     values = np.ones( ( size, ), np.int32 )
@@ -49,19 +50,17 @@ class reduction( util.Program ):
       self.queue, ( size, ), ( g_size, ), values_b, result_b
     )
 
-    for i in xrange( 100 ):
+    for i in xrange( 1000 ):
       s1 = self.reduction.v2(
         self.queue, ( size, ), ( g_size, ), values_b, result_b,
         wait_for = [s1]
       )
-    s1.wait()
 
     cl.enqueue_copy( self.queue, result, result_b )
     return result[0]
 
   def v3( self ):
     size = 300000
-    g_size = 500
     mf = cl.mem_flags
 
     values = np.ones( ( size, ), np.int32 )
@@ -73,12 +72,11 @@ class reduction( util.Program ):
       self.queue, ( size, ), ( g_size, ), values_b, result_b
     )
 
-    for i in xrange( 100 ):
+    for i in xrange( 1000 ):
       s1 = self.reduction.v3(
         self.queue, ( size, ), ( g_size, ), values_b, result_b,
         wait_for = [s1]
       )
-    s1.wait()
 
     cl.enqueue_copy( self.queue, result, result_b )
     return result[0]

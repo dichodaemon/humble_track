@@ -1,3 +1,4 @@
+#define WORK_SIZE 512
 
 __kernel void v1( 
   __global int * values, __global int * result
@@ -26,13 +27,13 @@ __kernel void v2(
   uint lId = get_local_id( 0 );
   uint nGroups = get_num_groups( 0 );
 
-  __local int workArray[500];
+  __local int workArray[WORK_SIZE];
 
   /*workArray[lId] = values[id] * id;*/
   workArray[lId] = values[id] + 1;
 
 
-  for ( uint stride = 1; stride < 500; stride *= 2 ) {
+  for ( uint stride = 1; stride < WORK_SIZE; stride *= 2 ) {
     barrier( CLK_LOCAL_MEM_FENCE );
     uint index = 2 * stride * lId;
     if ( index + stride < gSize ) {
@@ -61,13 +62,13 @@ __kernel void v3(
   uint lId = get_local_id( 0 );
   uint nGroups = get_num_groups( 0 );
 
-  __local int workArray[512];
+  __local int workArray[WORK_SIZE];
 
   /*workArray[lId] = values[id] * id;*/
   workArray[lId] = values[id] + 1;
 
 
-  for ( uint stride = 256; stride > 0; stride /= 2 ) {
+  for ( uint stride = WORK_SIZE / 2; stride > 0; stride /= 2 ) {
     barrier( CLK_LOCAL_MEM_FENCE );
     if ( lId < stride && lId + stride < gSize ) {
       workArray[lId] += workArray[lId + stride];
