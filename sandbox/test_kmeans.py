@@ -47,6 +47,7 @@ def gpu( data, clusters ):
   tick( "gDistortion" )
   distortion  = k_means_cpu.distortion( data, clusters, assignments )
   tack( "gDistortion" )
+  count = 0
   while True:
     print "GPU---"
     tick( "gMaximization" )
@@ -58,9 +59,12 @@ def gpu( data, clusters ):
     tick( "gDistortion" )
     distortion = k_means_cpu.distortion( data, t_clusters, assignments )
     tack( "gDistortion" )
+    if count == 0:
+      break
     if old_distortion != None and np.abs( old_distortion - distortion ) / old_distortion < 1E-4:
       break
     old_distortion = distortion
+    count += 1
   return t_clusters, distortion
 
 num_points = 307200
