@@ -44,7 +44,7 @@ def compute_histograms( np.ndarray[np.float32_t, ndim=2] labels, int num_texcels
     for j in xrange( window_size, d1 - window_size - 1 ) :
       for k in xrange( num_texcels ):
         result[i, j, k] = integrals[i + window_size, j + window_size, k] +\
-                       integrals[i, j, k] -\
-                       integrals[i + window_size, j, k] -\
-                       integrals[i, j + window_size, k]
+                          integrals[i - window_size, j - window_size, k] -\
+                          integrals[i + window_size, j - window_size, k] -\
+                          integrals[i - window_size, j + window_size, k]
   return result

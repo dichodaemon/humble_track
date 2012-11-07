@@ -16,55 +16,26 @@ def generate_data( num_points, num_clusters, dimensions ):
     data[i] = centroids[np.random.randint( num_clusters )] + np.random.normal( size = dimensions )
   return data, centroids
 
-def cpu( data, clusters ):
-  tick( "Expectation" )
+def kmeans_cpu( data, clusters ):
   assignments = k_means_cpu.expectation( data, clusters )
-  tack( "Expectation" )
   old_distortion = None
-  tick( "Distortion" )
   distortion  = k_means_cpu.distortion( data, clusters, assignments )
-  tack( "Distortion" )
-  while True:
-    tick( "Maximization" )
+  while old_distortion == None or np.abs( old_distortion - distortion ) / distortion > 1E-4:
     t_clusters = k_means_cpu.maximization( data, assignments, num_clusters )
-    tack( "Maximization" )
-    tick( "Expectation" )
     assignments = k_means_cpu.expectation( data, t_clusters )
-    tack( "Expectation" )
-    tick( "Distortion" )
-    distortion = k_means_cpu.distortion( data, t_clusters, assignments )
-    tack( "Distortion" )
-    if old_distortion != None and np.abs( old_distortion - distortion ) / old_distortion < 1E-4:
-      break
     old_distortion = distortion
+    distortion = k_means_cpu.distortion( data, t_clusters, assignments )
   return t_clusters, distortion
 
-def gpu( data, clusters ):
-  tick( "gExpectation" )
+def kmeans_gpu( data, clusters ):
   assignments = k_means_gpu.expectation( data, clusters )
-  tack( "gExpectation" )
   old_distortion = None
-  tick( "gDistortion" )
   distortion  = k_means_cpu.distortion( data, clusters, assignments )
-  tack( "gDistortion" )
-  count = 0
-  while True:
-    print "GPU---"
-    tick( "gMaximization" )
+  while old_distortion == None or np.abs( old_distortion - distortion ) / distortion > 1E-4:
     t_clusters = k_means_cpu.maximization( data, assignments, num_clusters )
-    tack( "gMaximization" )
-    tick( "gExpectation" )
     assignments = k_means_gpu.expectation( data, t_clusters )
-    tack( "gExpectation" )
-    tick( "gDistortion" )
-    distortion = k_means_cpu.distortion( data, t_clusters, assignments )
-    tack( "gDistortion" )
-    if count == 0:
-      break
-    if old_distortion != None and np.abs( old_distortion - distortion ) / old_distortion < 1E-4:
-      break
     old_distortion = distortion
-    count += 1
+    distortion = k_means_cpu.distortion( data, t_clusters, assignments )
   return t_clusters, distortion
 
 num_points = 307200
@@ -76,12 +47,12 @@ data, _ = generate_data( num_points, num_clusters, dimensions )
 clusters = k_means_cpu.init_clusters( data, dimensions )
 
 tick( "CPU" )
-_, distortion = cpu( data, clusters )
+_, distortion = kmeans_cpu( data, clusters )
 tack( "CPU" )
 print "CPU", distortion
 
 tick( "GPU" )
-_, distortion = gpu( data, clusters )
+_, distortion = kmeans_gpu( data, clusters )
 tack( "GPU" )
 print "GPU", distortion
 

@@ -28,6 +28,11 @@ if __name__ == "__main__":
         "humble_track.compute_histograms", 
         ["python/humble_track/compute_histograms.pyx"],
         extra_compile_args = ["-O3"] 
+      ),
+      Extension( 
+        "humble_track.kmeans_cpu", 
+        ["python/humble_track/kmeans_cpu.pyx"],
+        extra_compile_args = ["-O3"] 
       )
     ]
   )

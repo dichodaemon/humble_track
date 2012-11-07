@@ -26,7 +26,7 @@ parser.add_option(
   dest = "window_size", default = 5
 )
 parser.add_option( 
-  "--texel_count", help = "Number of texcels", type = "int", 
+  "--num_texcels", help = "Number of texcels", type = "int", 
   dest = "num_texcels", default = 16
 )
 parser.add_option( 
@@ -45,6 +45,7 @@ filename =  args[0]
 capture = cv.CaptureFromFile( filename )
 cv.NamedWindow( filename )
 cv.NamedWindow( "Segmented" )
+cv.NamedWindow( "Groups" )
 
 detector = ht.Detector( 
   window_size = options.window_size, 
@@ -68,11 +69,21 @@ while True:
     detector.learn( np_frame )
   elif current_frame > 10:
     logger.debug( "Segmenting frame #%i", current_frame )
-    fg = detector.segment( np_frame ).astype( np.int8 )
+    fg = detector.segment( np_frame )
     cv.ShowImage( "Segmented", cv.fromarray( ht.colorize( fg, palette ) ) )
+    group_count, groups, group_sizes, gs = ht.find_groups( fg )
+    image = np.asarray( frame ) * 1
+    final_groups = group_count
+    for i in xrange( group_count ):
+      if group_sizes[i] < 20 or group_sizes[i] > 800 or gs[i] > 1000:
+        image[groups == i] *= 0
+        final_groups -= 1
+    print final_groups
+    cv.ShowImage( "Groups", cv.fromarray( image ) )
   else:
     cv.ShowImage( "Segmented", frame )
+    cv.ShowImage( "Groups", frame )
   cv.ShowImage( filename, frame )
-  key = cv.WaitKey( 10 )
+  key = cv.WaitKey( 20 )
   if key == 27:
     sys.exit( 0 )
