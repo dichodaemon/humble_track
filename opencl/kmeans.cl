@@ -1,3 +1,5 @@
+#define GROUP_SIZE 512
+
 void computeExpectation( 
   int index, int dim, int k,
   __global float * data, __global float * centroids, __global int * assignments
@@ -19,7 +21,8 @@ void computeExpectation(
 
 __kernel void expectation( 
   int dim, int k, 
-  __global float * data, __global float * centroids, __global int * assignments
+  __global float * data, __global float * centroids, __global int * assignments,
+  __global float * buffer
 ) {
   unsigned int index = get_global_id( 0 );
   computeExpectation( index, dim, k, data, centroids, assignments );
@@ -38,32 +41,37 @@ __kernel void kmeans(
 
   computeExpectation( id, dim, k, data, centroids, assignments );
 
-  __local float workArray[512];
-  for ( uint c = 0; c < k, ++c ) {
+  barrier( CLK_LOCAL_MEM_FENCE );
+
+  __local float workArray[GROUP_SIZE];
+  __local uint countArray[GROUP_SIZE];
+
+  for ( uint c = 0; c < k; ++c ) {
     uint count = 0;
-    for ( uint d = 0; d < dim; ++d ) {
-      if ( assignments[id] == c ) {
-        workArray[lId] = data[id * dim + d
-        count += 1;
-      } else {
-        workArray[lId] = 0;
+    if ( assignments[id] == c ) {
+      countArray[lId] = 1;
+      for ( uint d = 0; d < dim; ++d ) {
+        barrier( CLK_LOCAL_MEM_FENCE );
+        workArray[lId] = data[id * dim + d];
         for ( uint stride = WORK_SIZE / 2; stride > 0; stride /= 2 ) {
           barrier( CLK_LOCAL_MEM_FENCE );
           if ( lId < stride && lId + stride < gSize ) {
             workArray[lId] += workArray[lId + stride];
           }
         }
-
+    
         if ( lId == 0 ) {
-          result[gId] = workArray[0];
+          buffer[gId * dim + d] = workArray[0];
         }
         barrier( CLK_LOCAL_MEM_FENCE );
-
-        if ( id == 0 ) {
-          for ( int i = 1; i < nGroups; ++i ) {
-            result[0] += result[i];
-          }
-        }
+    
+      }
+    } else {
+      countArray[lId] = 0;
+    }
+    if ( id == 0 ) {
+      for ( int i = 0; i < nGroups; ++i ) {
+        centroids[c * dim + d] += buffer[i * dim + c];
       }
     }
   }
