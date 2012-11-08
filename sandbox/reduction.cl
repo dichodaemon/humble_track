@@ -115,8 +115,7 @@ __kernel void v4(
     barrier( CLK_LOCAL_MEM_FENCE );
     if ( nGroups <= gSize ) {
       break;
-    } else {
-      nGroups = nGroups / gSize + ( nGroups % gSize > 0 );
     }
+    nGroups = nGroups / gSize + ( nGroups % gSize > 0 );
   }
 }
