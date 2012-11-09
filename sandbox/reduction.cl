@@ -1,4 +1,4 @@
-#define WORK_SIZE 512
+#define WORK_SIZE 256
 
 __kernel void v1( 
   __global int * values, __global int * result
@@ -51,7 +51,7 @@ __kernel void v2(
   }
 }
 
-void reduce( uint groupId, uint localId, uint groupSize, __local int * workArray, __global int * result ) 
+void reduceIntArray( uint groupId, uint localId, uint groupSize, __local int * workArray, __global int * result ) 
 {
   for ( uint stride = WORK_SIZE / 2; stride > 0; stride /= 2 ) {
     barrier( CLK_LOCAL_MEM_FENCE );
@@ -66,6 +66,32 @@ void reduce( uint groupId, uint localId, uint groupSize, __local int * workArray
   barrier( CLK_LOCAL_MEM_FENCE );
 }
 
+void reduceInt( __local int * workArray, __global int * result ) 
+{
+  uint id = get_global_id( 0 );
+  uint gSize = get_local_size( 0 );
+  uint gId = get_group_id( 0 );
+  uint lId = get_local_id( 0 );
+  uint nGroups = get_num_groups( 0 );
+
+  reduceIntArray( gId, lId, gSize, workArray, result );
+
+  while ( gSize * gId < nGroups ) {
+    if ( gSize * gId + lId < nGroups ) {
+      workArray[lId] = result[gSize * gId + lId];
+    } else {
+      workArray[lId] = 0;
+    }
+    barrier( CLK_LOCAL_MEM_FENCE );
+    reduceIntArray( gId, lId, gSize, workArray, result );
+    if ( nGroups <= gSize ) {
+      break;
+    }
+    nGroups = nGroups / gSize + ( nGroups % gSize > 0 );
+  }
+}
+
+
 __kernel void v3( 
   __global int * values, __global int * result
 ) {
@@ -79,7 +105,7 @@ __kernel void v3(
 
   workArray[lId] = values[id] + 1;
 
-  reduce( gId, lId, gSize, workArray, result );
+  reduceIntArray( gId, lId, gSize, workArray, result );
 
   if ( id == 0 ) {
     for ( int i = 1; i < nGroups; ++i ) {
@@ -101,21 +127,43 @@ __kernel void v4(
   __local int workArray[WORK_SIZE];
 
   workArray[lId] = values[id] + 1;
+  reduceInt( workArray, result );
+}
 
+__kernel void v5a( 
+  int size, __global int * values, __global int * result
+) {
+  uint id = get_global_id( 0 );
+  uint gSize = get_local_size( 0 );
+  uint gId = get_group_id( 0 );
+  uint lId = get_local_id( 0 );
+  uint nGroups = get_num_groups( 0 );
 
-  reduce( gId, lId, gSize, workArray, result );
+  __local int workArray[WORK_SIZE];
 
-  while ( gSize * gId < nGroups ) {
-    if ( gSize * gId + lId < nGroups ) {
-      workArray[lId] = result[gSize * gId + lId];
-    } else {
-      workArray[lId] = 0;
-    }
-    reduce( gId, lId, gSize, workArray, result );
-    barrier( CLK_LOCAL_MEM_FENCE );
-    if ( nGroups <= gSize ) {
-      break;
-    }
-    nGroups = nGroups / gSize + ( nGroups % gSize > 0 );
+  if ( id < size ) {
+    workArray[lId] = values[id] + 1;
+  } else {
+    workArray[lId] = 0;
   }
+  reduceIntArray( gId, lId, gSize, workArray, result );
+}
+
+__kernel void v5b( 
+  int size, __global int * result
+) {
+  uint id = get_global_id( 0 );
+  uint gSize = get_local_size( 0 );
+  uint gId = get_group_id( 0 );
+  uint lId = get_local_id( 0 );
+  uint nGroups = get_num_groups( 0 );
+
+  __local int workArray[WORK_SIZE];
+
+  if ( id < size ) {
+    workArray[lId] = result[gId * gSize + lId];
+  } else {
+    workArray[lId] = 0;
+  }
+  reduceIntArray( gId, lId, gSize, workArray, result );
 }
