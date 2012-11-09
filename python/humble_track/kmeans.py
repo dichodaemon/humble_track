@@ -12,7 +12,7 @@ from tick_tack import *
 
 init_clusters = cpu.init_clusters
 
-def kmeans_cpu( data, clusters ):
+def kmeans_cpu( data, clusters, iterations = None ):
   assignments = cpu.expectation( data, clusters )
   old_distortion = None
   if iterations == None:
@@ -68,22 +68,22 @@ if __name__ == "__main__":
 
   data, _ = generate_data( num_points, num_clusters, dimensions )
 
-  clusters = k_means_cpu.init_clusters( data, dimensions )
+  clusters = init_clusters( data, dimensions )
 
   tick( "CPU" )
-  _, distortion = kmeans_cpu( data, clusters )
+  _, distortion = kmeans_cpu( data, clusters, 10 )
   tack( "CPU" )
   print "CPU", distortion
 
   tick( "GPU" )
-  _, distortion = kmeans_gpu( data, clusters )
+  _, distortion = kmeans_gpu( data, clusters, 10 )
   tack( "GPU" )
   print "GPU", distortion
 
-  #tick( "FULL_GPU" )
-  #_, distortion = kmeans( data, clusters )
-  #tack( "FULL_GPU" )
-  #print "FULL_GPU", distortion
+  tick( "FULL_GPU" )
+  _, distortion = gpu.kmeans( data, clusters )
+  tack( "FULL_GPU" )
+  print "FULL_GPU", distortion
 
   for s in stats( "CPU" ) + stats( "GPU" ) + stats( "FULL_GPU" ):
     print s

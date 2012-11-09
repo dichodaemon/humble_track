@@ -129,7 +129,7 @@ class reduction( util.Program ):
     values = np.ones( ( size, ), np.int32 )
     values_b = cl.Buffer( self.context, mf.READ_ONLY | mf.COPY_HOST_PTR, hostbuf = values )
     result = np.zeros( ( ngroups, ), np.int32 )
-    result_b = cl.Buffer( self.context, mf.WRITE_ONLY, result.nbytes )
+    result_b = cl.Buffer( self.context, mf.READ_WRITE, result.nbytes )
 
     s1 = self.reduction.v5a(
       self.queue, ( size, ), ( g_size, ), np.int32( size ), values_b, result_b
