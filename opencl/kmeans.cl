@@ -2,7 +2,7 @@
 
 void computeExpectation( 
   int index, int dim, int k,
-  __global float * data, __global float * centroids, __global int * assignments
+  __global float * data, __constant float * centroids, __global int * assignments
 ) {
   float minDistance = 1E6;
 
@@ -21,7 +21,7 @@ void computeExpectation(
 
 __kernel void expectation( 
   int dim, int k, 
-  __global float * data, __global float * centroids, __global int * assignments
+  __global float * data, __constant float * centroids, __global int * assignments
 ) {
   unsigned int index = get_global_id( 0 );
   computeExpectation( index, dim, k, data, centroids, assignments );
@@ -65,7 +65,7 @@ __kernel void reduceFloat(
 
 __kernel void kmeans1(
   int dim, int k, 
-  __global float * data, __global float * centroids, __global int * assignments
+  __global float * data, __constant float * centroids, __global int * assignments
 ) {
   uint id = get_global_id( 0 );
   computeExpectation( id, dim, k, data, centroids, assignments );
@@ -74,7 +74,7 @@ __kernel void kmeans1(
 
 __kernel void kmeans2(
   int size, int dim, int k, int d, int c, 
-  __global float * data, __global float * centroids, __global int * assignments,
+  __global float * data, __global int * assignments,
   __global float * buffer
 ) {
   uint id = get_global_id( 0 );
@@ -87,7 +87,7 @@ __kernel void kmeans2(
 
   uint index = id * dim + d;
 
-  if ( id < size && assignments[index] == c ) {
+  if ( id < size && assignments[id] == c ) {
     workArray[lId] = data[index];
   } else {
     workArray[lId] = 0;
