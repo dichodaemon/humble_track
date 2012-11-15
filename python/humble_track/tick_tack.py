@@ -31,12 +31,11 @@ def tick( name ):
       raise "Problems here"
   current.append( name )
 
-def tack( name ):
+def tack():
+  name = current.pop()
   t = time.time() - last[name]
   times[name] += t
   count[name] += 1
-  if name != current.pop():
-    raise "Problems here"
 
 def stats( name, level = 0 ):
   indent = "\t" * level

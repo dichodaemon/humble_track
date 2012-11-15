@@ -1,6 +1,41 @@
-#define WORK_SIZE 256
+#define WORK_SIZE 512
 
 void computeExpectation( 
+  int index, int dim, int k,
+  float * work, __constant float * centroids, __global int * assignments
+) {
+  int minCluster = 0;
+  float minDistance = 1E6;
+
+  for ( int cluster = 0; cluster < k; ++cluster ) {
+    float distance = 0;
+    for ( int d = 0; d < dim; ++d ) {
+      float tmp = work[d] - centroids[cluster * dim + d];
+      distance += tmp * tmp;
+    }
+    if ( distance < minDistance ) {
+      minDistance = distance;
+      minCluster  = cluster;
+    }
+  }
+  assignments[index] = minCluster;
+}
+
+__kernel void expectation( 
+  int dim, int k, 
+  __global float * data, __constant float * centroids, __global int * assignments
+) {
+  unsigned int index = get_global_id( 0 );
+  float work[64];
+
+  for ( int d = 0; d < dim; ++d ) {
+    work[d] = data[index * dim + d];
+  }
+
+  computeExpectation( index, dim, k, work, centroids, assignments );
+}
+
+void computeExpectation1( 
   int index, int dim, int k,
   __global float * data, __constant float * centroids, __global int * assignments
 ) {
@@ -19,12 +54,12 @@ void computeExpectation(
   }
 }
 
-__kernel void expectation( 
+__kernel void expectation1( 
   int dim, int k, 
   __global float * data, __constant float * centroids, __global int * assignments
 ) {
   unsigned int index = get_global_id( 0 );
-  computeExpectation( index, dim, k, data, centroids, assignments );
+  computeExpectation1( index, dim, k, data, centroids, assignments );
 }
 
 
@@ -67,8 +102,14 @@ __kernel void kmeans1(
   int dim, int k, 
   __global float * data, __constant float * centroids, __global int * assignments
 ) {
-  uint id = get_global_id( 0 );
-  computeExpectation( id, dim, k, data, centroids, assignments );
+  unsigned int index = get_global_id( 0 );
+  float work[32];
+
+  for ( int d = 0; d < dim; ++d ) {
+    work[dim + d] = data[index * dim + d];
+  }
+
+  computeExpectation( index, dim, k, work, centroids, assignments );
 }
 
 

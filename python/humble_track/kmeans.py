@@ -71,12 +71,12 @@ if __name__ == "__main__":
   clusters = init_clusters( data, dimensions )
 
   tick( "CPU" )
-  _, distortion = kmeans_cpu( data, clusters, 10 )
+  _, distortion = kmeans_cpu( data, clusters, 5 )
   tack( "CPU" )
   print "CPU", distortion
 
   tick( "GPU" )
-  _, distortion = kmeans_gpu( data, clusters, 10 )
+  _, distortion = kmeans_gpu( data, clusters, 5 )
   tack( "GPU" )
   print "GPU", distortion
 

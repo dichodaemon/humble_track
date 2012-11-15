@@ -46,7 +46,7 @@ class Detector( object ):
     texcels = compute_texcels( frame, self.w1, self.w2, self.w3 )
     #self.tc_codebook, _ = kmeans_gpu( flatten( texcels ), self.tc_codebook )
     logger.debug( "Building texcel image" )
-    tc_image, _ = vq( flatten( texcels ), self.tc_codebook )
+    tc_image = ht.gpu.expectation( flatten( texcels ), self.tc_codebook )
     tc_image = tc_image.astype( np.float32 )
     tc_image = tc_image.reshape( frame.shape[:2] )
     
@@ -54,7 +54,7 @@ class Detector( object ):
     histograms = compute_histograms( tc_image, self.num_texcels, self.window_size )
     #self.hg_codebook, _ = kmeans_gpu( flatten( histograms ), self.ht_codebook )
     logger.debug( "Building histogram image" )
-    hg_image, _ = vq( flatten( histograms ), self.hg_codebook )
+    hg_image = ht.gpu.expectation( flatten( histograms ), self.hg_codebook )
     hg_image = hg_image.astype( np.int32 )
     hg_image = hg_image.reshape( frame.shape[:2] )
     return hg_image
