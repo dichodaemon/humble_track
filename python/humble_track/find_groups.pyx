@@ -108,16 +108,16 @@ def find_groups( np.ndarray[np.int32_t, ndim=2] image ):
       group = index[fg]
       groups[i, j] = group
       counts[group] += 1
-      if maxx[group] == -1 or i > maxx[group]:
-        maxx[group] = i
-      if maxy[group] == -1 or j > maxy[group]:
-        maxy[group] = j
-      if minx[group] == -1 or i < minx[group]:
-        minx[group] = i
-      if miny[group] == -1 or j < miny[group]:
-        miny[group] = j
+      #if maxx[group] == -1 or i > maxx[group]:
+        #maxx[group] = i
+      #if maxy[group] == -1 or j > maxy[group]:
+        #maxy[group] = j
+      #if minx[group] == -1 or i < minx[group]:
+        #minx[group] = i
+      #if miny[group] == -1 or j < miny[group]:
+        #miny[group] = j
   
-  return group_count, groups, counts, maxx - minx * maxy - miny
+  return group_count, groups, counts#, maxx - minx * maxy - miny
 
 
 

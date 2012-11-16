@@ -27,14 +27,14 @@ class fg_detector( ht.opencl.Program ):
     self.levels = levels
 
     mf = cl.mem_flags
-    self.counts = np.ones( ( self.size * self.levels, ), np.int32 )
+    self.counts = np.ones( ( self.size * self.levels, ), np.int32 ) * self.levels
     self.counts_b = cl.Buffer( self.context, mf.READ_WRITE | mf.COPY_HOST_PTR, hostbuf = self.counts )
 
   def __call__( self, data ):
     mf = cl.mem_flags
 
     data_b = cl.Buffer( self.context, mf.READ_ONLY | mf.COPY_HOST_PTR, hostbuf = data )
-    result = np.zeros( ( self.size, ), np.float32 ) 
+    result = np.zeros( ( self.size, ), np.int32 ) 
     result_b = cl.Buffer( self.context, mf.READ_WRITE, result.nbytes )
 
     self.detector.detect(
@@ -116,17 +116,26 @@ while True:
     ht_image = ht.gpu.expectation( ht.flatten( histograms ), ht_codebook, True ).reshape( np_frame.shape[:2] )
     ht.tack()
 
-    image  = ht_image
-    image  = image.reshape( image.shape[0] * image.shape[1] )
-    levels = options.num_histograms
+    ht.tick( "superpixels" )
+    sp_count, superpixels, counts = ht.find_groups( ht_image )
+    ht.tack()
 
-    #if current_frame == 10:
-      #detector = fg_detector( image.shape[0], levels )
-    #else:
-      #fg = detector( image ).reshape( np_frame.shape[:2] )
-      #image = cv.fromarray( fg )
-      #cv.ShowImage( "Output", image )
-    cv.ShowImage( "Output", cv.fromarray( 1.0 * ht_image / options.num_histograms ) )
+    image  = tc_image
+    image  = image.reshape( image.shape[0] * image.shape[1] )
+    levels = options.num_texcels
+
+    if current_frame == 10:
+      detector = fg_detector( image.shape[0], levels )
+    else:
+      ht.tick( "fg pixels" )
+      fg = detector( image ).reshape( np_frame.shape[:2] )
+      ht.tack()
+      ht.tick( "fg superpixels" )
+      fg_superpixels, fg_mask = ht.foreground_groups( fg, superpixels, counts, sp_count )
+      ht.tack()
+      tframe = np.asarray( frame ) * 1
+      tframe[fg_mask == 0] = 0
+      cv.ShowImage( "Output", cv.fromarray( tframe ) )
   ht.tack()
   for s in ht.stats( "frame" ):
     print s

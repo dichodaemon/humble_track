@@ -2,23 +2,24 @@
 
 
 __kernel void detect( 
-  int levels, __global int * data, __global int * counts, __global float * result
+  int levels, __global int * data, __global int * counts, __global int * result
 ) {
-  unsigned int index = get_global_id( 0 );
+  uint index = get_global_id( 0 );
+  uint level = data[index];
 
   float sum = 0;
   for ( int l = 0; l < levels; ++l ) {
     sum += counts[index * levels + l];
   }
 
-  result[index] = 1.0 - counts[index * levels + data[index]] / sum;
-  /*if ( result[index] < 0.999 ) {*/
-    /*result[index] = 0;*/
-  /*}*/
-
-  barrier( CLK_LOCAL_MEM_FENCE );
-
-  counts[index * levels + data[index]] += 1;
+  float val  = 1.0 - counts[index * levels + level] / sum;
+  if ( val < 0.96) {
+    val = 0;
+  } else {
+    val = 1;
+  }
+  result[index] = val;
+  counts[index * levels + level] += 1;
 }
 
 __kernel void detect1( 

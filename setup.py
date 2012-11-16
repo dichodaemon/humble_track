@@ -30,6 +30,11 @@ if __name__ == "__main__":
         extra_compile_args = ["-O3"] 
       ),
       Extension( 
+        "humble_track.foreground_groups", 
+        ["python/humble_track/foreground_groups.pyx"],
+        extra_compile_args = ["-O3"] 
+      ),
+      Extension( 
         "humble_track.kmeans_cpu", 
         ["python/humble_track/kmeans_cpu.pyx"],
         extra_compile_args = ["-O3"] 
