@@ -12,6 +12,7 @@ import humble_track as ht
 import cv
 import numpy as np
 import logging
+from math import *
 
 from optparse import OptionParser
 import time
@@ -27,20 +28,55 @@ class fg_detector( ht.opencl.Program ):
     self.levels = levels
 
     mf = cl.mem_flags
-    self.counts = np.ones( ( self.size * self.levels, ), np.int32 ) * self.levels
+    self.counts = np.ones( ( self.size * self.levels, ), np.float32 ) * self.levels
     self.counts_b = cl.Buffer( self.context, mf.READ_WRITE | mf.COPY_HOST_PTR, hostbuf = self.counts )
+    result = np.zeros( ( self.size, ), np.float32 ) 
+    self.result_b = cl.Buffer( self.context, mf.READ_WRITE, result.nbytes )
+
+  def __call__( self, data ):
+    mf = cl.mem_flags
+
+    result = np.zeros( ( self.size, ), np.float32 ) 
+    data_b = cl.Buffer( self.context, mf.READ_ONLY | mf.COPY_HOST_PTR, hostbuf = data )
+
+    self.detector.detect(
+      self.queue, ( self.size, ), None,
+      np.int32( levels ),
+      data_b, self.counts_b, self.result_b 
+    )
+
+    cl.enqueue_copy( self.queue, result, self.result_b )
+    return result
+
+class object_detector( ht.opencl.Program ):
+  def __init__( self, shape, cell_size, weight ):
+    ht.opencl.Program.__init__( self )
+    self.detector = self.loadProgram( "object_detector.cl" )
+    self.shape = shape
+    self.cell_size = cell_size
+    self.x_cells = int( ceil( 1.0 * shape[0] / cell_size ) )
+    self.y_cells = int( ceil( 1.0 * shape[1] / cell_size ) )
+    self.weight = weight
+    print self.shape, self.cell_size, self.x_cells, self.y_cells
+
+    mf = cl.mem_flags
+    self.sum = np.zeros( ( self.x_cells, self.y_cells ), np.int32 )
+    self.sum_b = cl.Buffer( self.context, mf.READ_WRITE | mf.COPY_HOST_PTR, hostbuf = self.sum )
 
   def __call__( self, data ):
     mf = cl.mem_flags
 
     data_b = cl.Buffer( self.context, mf.READ_ONLY | mf.COPY_HOST_PTR, hostbuf = data )
-    result = np.zeros( ( self.size, ), np.int32 ) 
+    result = np.zeros( self.shape, np.float32 ) 
     result_b = cl.Buffer( self.context, mf.READ_WRITE, result.nbytes )
 
     self.detector.detect(
-      self.queue, ( self.size, ), None,
-      np.int32( levels ),
-      data_b, self.counts_b, result_b 
+      self.queue, ( self.x_cells, self.y_cells), None,
+      np.int32( self.shape[0] ),
+      np.int32( self.shape[1] ),
+      np.int32( self.cell_size ),
+      np.float32( self.weight ),
+      data_b, self.sum_b, result_b 
     )
 
     cl.enqueue_copy( self.queue, result, result_b )
@@ -84,7 +120,14 @@ tc_codebook = None
 
 current_frame = 0
 while True:
-  frame = cv.GetMat( cv.QueryFrame( capture ) )
+  done = False
+  while not done:
+    try: 
+      frame = cv.GetMat( cv.QueryFrame( capture ) )
+      done = True
+    except cv.error:
+      cv.SetCaptureProperty( capture, cv.CV_CAP_PROP_POS_FRAMES, 0 )
+
   current_frame += 1
   cielab = cv.CreateMat( frame.rows, frame.cols, frame.type )
   cv.CvtColor( frame, cielab, cv.CV_RGB2Lab )
@@ -105,41 +148,48 @@ while True:
     ht.tack()
 
 
-    ht.tick( "histograms" )
-    histograms = ht.compute_histograms( tc_image.astype( np.float32 ), options.num_texcels, options.window_size )
-    ht.tack()
-    if current_frame == 10:
-      ht_codebook = ht.init_clusters( ht.flatten( histograms ), options.num_histograms )
-      ht_codebook, _ = ht.kmeans_gpu( ht.flatten( histograms ), ht_codebook )
+    #ht.tick( "histograms" )
+    #histograms = ht.compute_histograms( tc_image.astype( np.float32 ), options.num_texcels, options.window_size )
+    #ht.tack()
+    #if current_frame == 10:
+      #ht_codebook = ht.init_clusters( ht.flatten( histograms ), options.num_histograms )
+      #ht_codebook, _ = ht.kmeans_gpu( ht.flatten( histograms ), ht_codebook )
 
-    ht.tick( "hg labels" )
-    ht_image = ht.gpu.expectation( ht.flatten( histograms ), ht_codebook, True ).reshape( np_frame.shape[:2] )
-    ht.tack()
+    #ht.tick( "hg labels" )
+    #ht_image = ht.gpu.expectation( ht.flatten( histograms ), ht_codebook, True ).reshape( np_frame.shape[:2] )
+    #ht.tack()
 
-    ht.tick( "superpixels" )
-    sp_count, superpixels, counts = ht.find_groups( ht_image )
-    ht.tack()
+    #ht.tick( "superpixels" )
+    #sp_count, superpixels, counts = ht.find_groups( ht_image )
+    #ht.tack()
 
     image  = tc_image
     image  = image.reshape( image.shape[0] * image.shape[1] )
     levels = options.num_texcels
 
     if current_frame == 10:
-      detector = fg_detector( image.shape[0], levels )
+      detector        = fg_detector( image.shape[0], levels )
+      object_detector = object_detector( np_frame.shape[:2], 8, 0.96 )
     else:
       ht.tick( "fg pixels" )
       fg = detector( image ).reshape( np_frame.shape[:2] )
       ht.tack()
-      ht.tick( "fg superpixels" )
-      fg_superpixels, fg_mask = ht.foreground_groups( fg, superpixels, counts, sp_count )
+      ht.tick( "fg objects" )
+      objects = object_detector( fg )
       ht.tack()
-      tframe = np.asarray( frame ) * 1
-      tframe[fg_mask == 0] = 0
+      #ht.tick( "fg superpixels" )
+      #fg_superpixels, fg_mask = ht.foreground_groups( fg, superpixels, counts, sp_count )
+      #ht.tack()
+      tframe = objects * 1.0
+      #tframe = np.asarray( fg ) * 1
+      #tframe[fg_mask == 0] = 0
       cv.ShowImage( "Output", cv.fromarray( tframe ) )
   ht.tack()
   for s in ht.stats( "frame" ):
     print s
   cv.ShowImage( filename, frame )
+
+  
   key = cv.WaitKey( 10 )
   if key == 27:
     sys.exit( 0 )
