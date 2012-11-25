@@ -4,7 +4,7 @@ from tick_tack import *
 
 import util
 
-size = 300000 * 12
+size = 175000 * 12
 g_size = 250
 reps   = 10
 

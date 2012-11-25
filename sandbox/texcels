@@ -169,7 +169,7 @@ while True:
 
     if current_frame == 10:
       detector        = fg_detector( image.shape[0], levels )
-      object_detector = object_detector( np_frame.shape[:2], 8, 0.96 )
+      object_detector = object_detector( np_frame.shape[:2], 15, 0.8 )
     else:
       ht.tick( "fg pixels" )
       fg = detector( image ).reshape( np_frame.shape[:2] )
