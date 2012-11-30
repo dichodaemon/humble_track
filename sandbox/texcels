@@ -10,6 +10,7 @@ sys.path.append( os.path.abspath( os.path.join( BASE_DIR, "build" ) ) )
 
 import humble_track as ht
 import cv
+import cv2
 import numpy as np
 import logging
 from math import *
@@ -28,7 +29,7 @@ class fg_detector( ht.opencl.Program ):
     self.levels = levels
 
     mf = cl.mem_flags
-    self.counts = np.ones( ( self.size * self.levels, ), np.float32 ) * self.levels
+    self.counts = np.ones( ( self.size * self.levels, ), np.float32 ) * 1.0 / self.levels
     self.counts_b = cl.Buffer( self.context, mf.READ_WRITE | mf.COPY_HOST_PTR, hostbuf = self.counts )
     result = np.zeros( ( self.size, ), np.float32 ) 
     self.result_b = cl.Buffer( self.context, mf.READ_WRITE, result.nbytes )
@@ -39,7 +40,7 @@ class fg_detector( ht.opencl.Program ):
     result = np.zeros( ( self.size, ), np.float32 ) 
     data_b = cl.Buffer( self.context, mf.READ_ONLY | mf.COPY_HOST_PTR, hostbuf = data )
 
-    self.detector.detect(
+    self.detector.detect1(
       self.queue, ( self.size, ), None,
       np.int32( levels ),
       data_b, self.counts_b, self.result_b 
@@ -104,13 +105,14 @@ parser.add_option(
 
 options, args = parser.parse_args()
 
-if len( args ) < 1:
-  parser.error( "Incorrect number of arguments" )
-  exit( 1 )
 
-filename =  args[0]
 
-capture = cv.CaptureFromFile( filename )
+if len( args ) == 0:
+  filename =  ""
+  capture = cv2.VideoCapture( 0 )
+else:
+  filename =  args[0]
+  capture = cv2.VideoCapture( filename )
 cv.NamedWindow( filename )
 cv.NamedWindow( "Output" )
 
@@ -122,29 +124,26 @@ current_frame = 0
 while True:
   done = False
   while not done:
-    try: 
-      frame = cv.GetMat( cv.QueryFrame( capture ) )
-      done = True
-    except cv.error:
-      cv.SetCaptureProperty( capture, cv.CV_CAP_PROP_POS_FRAMES, 0 )
+    done, camera_frame = capture.read()
+    current_frame += 1
+    if not done:
+      capture.set( cv.CV_CAP_PROP_POS_FRAMES, 0 )
+      #current_frame = 0
 
-  current_frame += 1
-  cielab = cv.CreateMat( frame.rows, frame.cols, frame.type )
-  cv.CvtColor( frame, cielab, cv.CV_RGB2Lab )
+  cielab = cv2.cvtColor( camera_frame, cv.CV_RGB2Lab )
 
-  np_frame = np.asarray( cielab )
   ht.tick( "frame" )
 
   if current_frame >= 10:
     ht.tick( "texcels" )
-    texcels = ht.compute_texcels( np_frame, 0.5, 1.0, 0.5 )
+    texcels = ht.compute_texcels( cielab, 0.5, 0.1, 5.0 )
     ht.tack()
     if current_frame == 10:
       tc_codebook = ht.init_clusters( ht.flatten( texcels ), options.num_texcels )
       tc_codebook, _ = ht.kmeans_gpu( ht.flatten( texcels ), tc_codebook )
 
     ht.tick( "tc labels" )
-    tc_image = ht.gpu.expectation( ht.flatten( texcels ), tc_codebook, True ).reshape( np_frame.shape[:2] )
+    tc_image = ht.gpu.expectation( ht.flatten( texcels ), tc_codebook, True ).reshape( cielab.shape[:2] )
     ht.tack()
 
 
@@ -156,7 +155,7 @@ while True:
       #ht_codebook, _ = ht.kmeans_gpu( ht.flatten( histograms ), ht_codebook )
 
     #ht.tick( "hg labels" )
-    #ht_image = ht.gpu.expectation( ht.flatten( histograms ), ht_codebook, True ).reshape( np_frame.shape[:2] )
+    #ht_image = ht.gpu.expectation( ht.flatten( histograms ), ht_codebook, True ).reshape( cielab.shape[:2] )
     #ht.tack()
 
     #ht.tick( "superpixels" )
@@ -169,25 +168,29 @@ while True:
 
     if current_frame == 10:
       detector        = fg_detector( image.shape[0], levels )
-      object_detector = object_detector( np_frame.shape[:2], 15, 0.8 )
+      detector1 = cv2.BackgroundSubtractorMOG( 10, 100, 0.9 )
+      object_detector = object_detector( cielab.shape[:2], 10, 0.8 )
     else:
       ht.tick( "fg pixels" )
-      fg = detector( image ).reshape( np_frame.shape[:2] )
+      #fg = detector1.apply( camera_frame )
+      fg = detector( image ).reshape( cielab.shape[:2] )
       ht.tack()
       ht.tick( "fg objects" )
-      objects = object_detector( fg )
+      objects = object_detector( fg.astype( np.float32 )  )
       ht.tack()
       #ht.tick( "fg superpixels" )
       #fg_superpixels, fg_mask = ht.foreground_groups( fg, superpixels, counts, sp_count )
       #ht.tack()
       tframe = objects * 1.0
+      tframe = camera_frame * 1
+      tframe[:, :, 2] = objects * 255
       #tframe = np.asarray( fg ) * 1
       #tframe[fg_mask == 0] = 0
-      cv.ShowImage( "Output", cv.fromarray( tframe ) )
+      cv2.imshow( "Output", tframe )
   ht.tack()
   for s in ht.stats( "frame" ):
     print s
-  cv.ShowImage( filename, frame )
+  cv2.imshow( filename, camera_frame )
 
   
   key = cv.WaitKey( 10 )
