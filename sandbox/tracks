@@ -1,0 +1,83 @@
+#! /usr/bin/python
+# -*- coding: utf-8 -*-
+
+import sys
+import os
+
+BASE_DIR = os.path.abspath( os.path.join( os.path.dirname( __file__ ), ".." ) )
+sys.path.append( os.path.abspath( os.path.join( BASE_DIR, "python" ) ) )
+sys.path.append( os.path.abspath( os.path.join( BASE_DIR, "build" ) ) )
+
+import humble_track as ht
+import cv
+import cv2
+import numpy as np
+import logging
+import random
+from math import *
+
+from optparse import OptionParser
+import time
+import pyopencl as cl
+
+logging.basicConfig()
+
+logger = logging.getLogger( __name__ )
+logger.setLevel( logging.DEBUG )
+
+# Process command line
+parser = OptionParser( usage = "usage: %prog [options] video_file" )
+parser.add_option( 
+  "--window_size", help = "Size of the histogram window", type = "int", 
+  dest = "window_size", default = 5
+)
+parser.add_option( 
+  "--num_texcels", help = "Number of texcels", type = "int", 
+  dest = "num_texcels", default = 16
+)
+parser.add_option( 
+  "--num_histograms", help = "Number of histograms", type = "int", 
+  dest = "num_histograms", default = 16
+)
+
+options, args = parser.parse_args()
+
+cv.NamedWindow( "Tracks" )
+screen = np.zeros( (1024, 1024, 3), np.uint8 )
+
+c = 0
+
+class simulator( object ):
+  def __init__( self ):
+    self.next_index = 0
+    self.objects   = {}
+
+  def step( self ):
+    observations = []
+    while random.random() < 0.1:
+      self.objects[self.next_index] = [np.random.randint( 0, 1024, 2 ), np.random.randint( 0, 1024, 2 ), np.zeros( (2, ) ), 0.0] 
+      self.next_index += 1
+    for id, o in self.objects.items():
+      start, goal, current, progress = o
+      o[2]  = start + ( goal - start ) * progress
+      o[3] += 0.005
+      if o[3] > 1.0:
+        del self.objects[id]
+      observations.append( o[2] )
+    return np.array( observations ), np.array( [np.random.randint( 0, 1024, 2 ) for i in xrange( random.randint( 0, 100 ) )] )
+
+sim = simulator()
+
+
+while True:
+  screen[:, :, :] = 0
+  observations, noise = sim.step()
+  for o in observations:
+    screen[int( o[0] ), int( o[1] ), :] = 255
+  for o in noise:
+    screen[int( o[0] ), int( o[1] ), :] = 255
+  cv2.imshow( "Tracks", screen )
+  key = cv.WaitKey( 1 )
+  if key == 27:
+    sys.exit( 0 )
+
